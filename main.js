@@ -10,13 +10,12 @@ const inputName = document.querySelector("#input__name");
 const inputPlace = document.querySelector("#input__place");
 const comments = document.querySelector("#comments");
 const inputText = document.querySelector("#input__text");
+const placemarks = []; // для использования внутри внешней функции openBalloonFull().
 
 function init() {
-  let myMap;
-  let clusterer;
   let myPlacemark;
-  let coordinates = [];
-  (myMap = new ymaps.Map(
+  let coordinates;
+  const myMap = new ymaps.Map(
     "map",
     {
       center: [58.01, 56.23], // Perm =)
@@ -25,23 +24,22 @@ function init() {
     {
       searchControlProvider: "yandex#search"
     }
-  )),
-    // Создание кластера.
-    (clusterer = new ymaps.Clusterer({
-      preset: "islands#invertedNightClusterIcons",
-      groupByCoordinates: false,
-      clusterDisableClickZoom: true,
-      clusterHideIconOnBalloonOpen: false,
-      geoObjectHideIconOnBalloonOpen: false,
-      clusterOpenBalloonOnClick: true,
-      clusterBalloonContentLayout: "cluster#balloonCarousel",
-      clusterBalloonPanelMaxMapArea: 0,
-      clusterBalloonContentLayoutWidth: 200,
-      clusterBalloonContentLayoutHeight: 250,
-      clusterBalloonPagerSize: 5,
-      clusterBalloonPagerType: "marker"
-    }));
-  const placemarks = [];
+  );
+  // Создание кластера.
+  const clusterer = new ymaps.Clusterer({
+    preset: "islands#invertedNightClusterIcons",
+    groupByCoordinates: false,
+    clusterDisableClickZoom: true,
+    clusterHideIconOnBalloonOpen: false,
+    geoObjectHideIconOnBalloonOpen: false,
+    clusterOpenBalloonOnClick: true,
+    clusterBalloonContentLayout: "cluster#balloonCarousel",
+    clusterBalloonPanelMaxMapArea: 0,
+    clusterBalloonContentLayoutWidth: 200,
+    clusterBalloonContentLayoutHeight: 250,
+    clusterBalloonPagerSize: 10,
+    clusterBalloonPagerType: "marker"
+  });
 
   clusterer.add(placemarks);
   myMap.geoObjects.add(clusterer);
@@ -52,39 +50,21 @@ function init() {
     coordinates = coords;
     comments.innerHTML = "Отзывов пока нет...";
 
-    if (myMap.balloon.isOpen()) {
-      myMap.balloon.close();
-    }
-
     // Выводим окно с отзывами и формой.
     openBalloon();
-
-    if (myPlacemark) {
-      myPlacemark.geometry.setCoordinates(coords);
-    } else {
-      myPlacemark = createPlacemark(coords);
-    }
-
+    myPlacemark = createPlacemark(coords);
     getAddress(coords);
   });
 
   // Создание метки.
   function createPlacemark(coords) {
-    return new ymaps.Placemark(
-      coords,
-      {},
-      {
-        preset: "islands#nightDotIcon",
-        draggable: false
-      }
-    );
+    return new ymaps.Placemark(coords);
   }
 
   // Определяем адрес по координатам (обратное геокодирование).
   function getAddress(coords) {
-    myPlacemark.properties.set("iconCaption", "поиск...");
     ymaps.geocode(coords).then(function(res) {
-      var firstGeoObject = res.geoObjects.get(0);
+      const firstGeoObject = res.geoObjects.get(0);
 
       myPlacemark.properties.set({
         // Формируем строку с данными об объекте.
@@ -95,9 +75,7 @@ function init() {
             : firstGeoObject.getAdministrativeAreas(),
           // Получаем путь до топонима, если метод вернул null, запрашиваем наименование здания.
           firstGeoObject.getThoroughfare() || firstGeoObject.getPremise()
-        ]
-          .filter(Boolean)
-          .join(", "),
+        ],
         // В качестве контента балуна задаем строку с адресом объекта.
         balloonContent: firstGeoObject.getAddressLine()
       });
@@ -111,7 +89,7 @@ function init() {
       // Получаем адрес отзыва.
       const addressLink = address.innerText;
 
-      // Задаем дату.
+      // Формируем дату.
       const date = new Date();
       let year = date.getFullYear();
       let month = `${date.getMonth() + 1}`;
@@ -139,7 +117,7 @@ function init() {
         {
           preset: "islands#nightDotIcon",
           draggable: false,
-          openBalloonOnClick: false
+          openBalloonOnClick: false // Используем custom balloon.
         }
       );
 
@@ -160,12 +138,10 @@ function init() {
       // Очищаем инпуты.
       clearInputs();
 
-      newPlacemark.events.add("click", function() {
+      newPlacemark.events.add("click", () => {
         openBalloon();
         comments.innerHTML = newPlacemark.commentContent;
-        coordinates = newPlacemark.geometry.getCoordinates();
         address.innerText = newPlacemark.place;
-        return coordinates;
       });
     } else {
       alert("Остались пустые поля.");
@@ -184,13 +160,14 @@ const clearInputs = () => {
   inputText.value = "";
 };
 
+// Наш кастомный балун.
 const openBalloon = () => {
   myBalloon.style.top = event.clientY + "px";
   myBalloon.style.left = event.clientX + "px";
   myBalloon.style.display = "block";
 };
 
-// Открываем балун, подгружая туда содержимое меток.
+// Балун с контентом из placemarks.
 const openBalloonFull = () => {
   address.innerText = "";
   comments.innerHTML = "";
